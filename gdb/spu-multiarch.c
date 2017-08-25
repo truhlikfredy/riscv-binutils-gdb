@@ -76,10 +76,11 @@ parse_spufs_run (ptid_t ptid, int *fd, CORE_ADDR *addr)
   tdep = gdbarch_tdep (target_gdbarch ());
 
   /* Fetch instruction preceding current NIP.  */
-  old_chain = save_inferior_ptid ();
-  inferior_ptid = ptid;
-  regval = target_read_memory (regcache_read_pc (regcache) - 4, buf, 4);
-  do_cleanups (old_chain);
+  {
+    scoped_restore save_inferior_ptid = make_scoped_restore (&inferior_ptid);
+    inferior_ptid = ptid;
+    regval = target_read_memory (regcache_read_pc (regcache) - 4, buf, 4);
+  }
   if (regval != 0)
     return 0;
   /* It should be a "sc" instruction.  */
@@ -107,7 +108,7 @@ spu_gdbarch (int spufs_fd)
   info.bfd_arch_info = bfd_lookup_arch (bfd_arch_spu, bfd_mach_spu);
   info.byte_order = BFD_ENDIAN_BIG;
   info.osabi = GDB_OSABI_LINUX;
-  info.tdep_info = &spufs_fd;
+  info.id = &spufs_fd;
   return gdbarch_find_by_info (info);
 }
 

@@ -37,6 +37,7 @@
 
 #include "floatformat.h"
 
+#include "dis-asm.h"
 
 struct displaced_step_closure *
 simple_displaced_step_copy_insn (struct gdbarch *gdbarch,
@@ -57,14 +58,6 @@ simple_displaced_step_copy_insn (struct gdbarch *gdbarch,
     }
 
   return (struct displaced_step_closure *) buf;
-}
-
-
-void
-simple_displaced_step_free_closure (struct gdbarch *gdbarch,
-                                    struct displaced_step_closure *closure)
-{
-  xfree (closure);
 }
 
 int
@@ -971,6 +964,36 @@ default_guess_tracepoint_registers (struct gdbarch *gdbarch,
   store_unsigned_integer (regs, register_size (gdbarch, pc_regno),
 			  gdbarch_byte_order (gdbarch), addr);
   regcache_raw_supply (regcache, pc_regno, regs);
+}
+
+int
+default_print_insn (bfd_vma memaddr, disassemble_info *info)
+{
+  disassembler_ftype disassemble_fn;
+
+  disassemble_fn = disassembler (info->arch, info->endian == BFD_ENDIAN_BIG,
+				 info->mach, exec_bfd);
+
+  gdb_assert (disassemble_fn != NULL);
+  return (*disassemble_fn) (memaddr, info);
+}
+
+/* See arch-utils.h.  */
+
+CORE_ADDR
+gdbarch_skip_prologue_noexcept (gdbarch *gdbarch, CORE_ADDR pc) noexcept
+{
+  CORE_ADDR new_pc = pc;
+
+  TRY
+    {
+      new_pc = gdbarch_skip_prologue (gdbarch, pc);
+    }
+  CATCH (ex, RETURN_MASK_ALL)
+    {}
+  END_CATCH
+
+  return new_pc;
 }
 
 /* -Wmissing-prototypes */

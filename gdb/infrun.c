@@ -66,10 +66,11 @@
 #include "common/enum-flags.h"
 #include "progspace-and-thread.h"
 #include "common/gdb_optional.h"
+#include "arch-utils.h"
 
 /* Prototypes for local functions */
 
-static void signals_info (char *, int);
+static void info_signals_command (char *, int);
 
 static void handle_command (char *, int);
 
@@ -1710,12 +1711,8 @@ displaced_step_clear (struct displaced_step_inferior_state *displaced)
   /* Indicate that there is no cleanup pending.  */
   displaced->step_ptid = null_ptid;
 
-  if (displaced->step_closure)
-    {
-      gdbarch_displaced_step_free_closure (displaced->step_gdbarch,
-                                           displaced->step_closure);
-      displaced->step_closure = NULL;
-    }
+  xfree (displaced->step_closure);
+  displaced->step_closure = NULL;
 }
 
 static void
@@ -1759,7 +1756,7 @@ displaced_step_dump_bytes (struct ui_file *file,
 static int
 displaced_step_prepare_throw (ptid_t ptid)
 {
-  struct cleanup *old_cleanups, *ignore_cleanups;
+  struct cleanup *ignore_cleanups;
   struct thread_info *tp = find_thread_ptid (ptid);
   struct regcache *regcache = get_thread_regcache (ptid);
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -1811,7 +1808,7 @@ displaced_step_prepare_throw (ptid_t ptid)
 
   displaced_step_clear (displaced);
 
-  old_cleanups = save_inferior_ptid ();
+  scoped_restore save_inferior_ptid = make_scoped_restore (&inferior_ptid);
   inferior_ptid = ptid;
 
   original = regcache_read_pc (regcache);
@@ -1837,7 +1834,6 @@ displaced_step_prepare_throw (ptid_t ptid)
 			      "Stepping over breakpoint in-line instead.\n");
 	}
 
-      do_cleanups (old_cleanups);
       return -1;
     }
 
@@ -1867,7 +1863,7 @@ displaced_step_prepare_throw (ptid_t ptid)
       /* The architecture doesn't know how or want to displaced step
 	 this instruction or instruction sequence.  Fallback to
 	 stepping over the breakpoint in-line.  */
-      do_cleanups (old_cleanups);
+      do_cleanups (ignore_cleanups);
       return -1;
     }
 
@@ -1885,8 +1881,6 @@ displaced_step_prepare_throw (ptid_t ptid)
   regcache_write_pc (regcache, copy);
 
   discard_cleanups (ignore_cleanups);
-
-  do_cleanups (old_cleanups);
 
   if (debug_displaced)
     fprintf_unfiltered (gdb_stdlog, "displaced: displaced pc to %s\n",
@@ -1944,11 +1938,10 @@ static void
 write_memory_ptid (ptid_t ptid, CORE_ADDR memaddr,
 		   const gdb_byte *myaddr, int len)
 {
-  struct cleanup *ptid_cleanup = save_inferior_ptid ();
+  scoped_restore save_inferior_ptid = make_scoped_restore (&inferior_ptid);
 
   inferior_ptid = ptid;
   write_memory (memaddr, myaddr, len);
-  do_cleanups (ptid_cleanup);
 }
 
 /* Restore the contents of the copy area for thread PTID.  */
@@ -4369,17 +4362,10 @@ wait_one (struct target_waitstatus *ws)
 static int					\
 thread_stopped_by_ ## REASON (ptid_t ptid)	\
 {						\
-  struct cleanup *old_chain;			\
-  int res;					\
-						\
-  old_chain = save_inferior_ptid ();		\
+  scoped_restore save_inferior_ptid = make_scoped_restore (&inferior_ptid); \
   inferior_ptid = ptid;				\
 						\
-  res = target_stopped_by_ ## REASON ();	\
-						\
-  do_cleanups (old_chain);			\
-						\
-  return res;					\
+  return target_stopped_by_ ## REASON ();	\
 }
 
 /* Generate thread_stopped_by_watchpoint.  */
@@ -5709,7 +5695,7 @@ handle_signal_stop (struct execution_control_state *ecs)
     {
       struct regcache *regcache = get_thread_regcache (ecs->ptid);
       struct gdbarch *gdbarch = get_regcache_arch (regcache);
-      struct cleanup *old_chain = save_inferior_ptid ();
+      scoped_restore save_inferior_ptid = make_scoped_restore (&inferior_ptid);
 
       inferior_ptid = ecs->ptid;
 
@@ -5729,8 +5715,6 @@ handle_signal_stop (struct execution_control_state *ecs)
             fprintf_unfiltered (gdb_stdlog,
                                 "infrun: (no data address available)\n");
 	}
-
-      do_cleanups (old_chain);
     }
 
   /* This is originated from start_remote(), start_inferior() and
@@ -6791,7 +6775,7 @@ process_event_stop_test (struct execution_control_state *ecs)
 	tmp_sal = find_pc_line (ecs->stop_func_start, 0);
 	if (tmp_sal.line != 0
 	    && !function_name_is_marked_for_skip (ecs->stop_func_name,
-						  &tmp_sal))
+						  tmp_sal))
 	  {
 	    if (execution_direction == EXEC_REVERSE)
 	      handle_step_into_function_backward (gdbarch, ecs);
@@ -7321,8 +7305,8 @@ handle_step_into_function (struct gdbarch *gdbarch,
 
   cust = find_pc_compunit_symtab (stop_pc);
   if (cust != NULL && compunit_language (cust) != language_asm)
-    ecs->stop_func_start = gdbarch_skip_prologue (gdbarch,
-						  ecs->stop_func_start);
+    ecs->stop_func_start
+      = gdbarch_skip_prologue_noexcept (gdbarch, ecs->stop_func_start);
 
   stop_func_sal = find_pc_line (ecs->stop_func_start, 0);
   /* Use the step_resume_break to step until the end of the prologue,
@@ -7400,8 +7384,8 @@ handle_step_into_function_backward (struct gdbarch *gdbarch,
 
   cust = find_pc_compunit_symtab (stop_pc);
   if (cust != NULL && compunit_language (cust) != language_asm)
-    ecs->stop_func_start = gdbarch_skip_prologue (gdbarch,
-						  ecs->stop_func_start);
+    ecs->stop_func_start
+      = gdbarch_skip_prologue_noexcept (gdbarch, ecs->stop_func_start);
 
   stop_func_sal = find_pc_line (stop_pc, 0);
 
@@ -8515,14 +8499,12 @@ sig_print_info (enum gdb_signal oursig)
 static void
 handle_command (char *args, int from_tty)
 {
-  char **argv;
   int digits, wordlen;
   int sigfirst, signum, siglast;
   enum gdb_signal oursig;
   int allsigs;
   int nsigs;
   unsigned char *sigs;
-  struct cleanup *old_chain;
 
   if (args == NULL)
     {
@@ -8537,24 +8519,23 @@ handle_command (char *args, int from_tty)
 
   /* Break the command line up into args.  */
 
-  argv = gdb_buildargv (args);
-  old_chain = make_cleanup_freeargv (argv);
+  gdb_argv built_argv (args);
 
   /* Walk through the args, looking for signal oursigs, signal names, and
      actions.  Signal numbers and signal names may be interspersed with
      actions, with the actions being performed for all signals cumulatively
      specified.  Signal ranges can be specified as <LOW>-<HIGH>.  */
 
-  while (*argv != NULL)
+  for (char *arg : built_argv)
     {
-      wordlen = strlen (*argv);
-      for (digits = 0; isdigit ((*argv)[digits]); digits++)
+      wordlen = strlen (arg);
+      for (digits = 0; isdigit (arg[digits]); digits++)
 	{;
 	}
       allsigs = 0;
       sigfirst = siglast = -1;
 
-      if (wordlen >= 1 && !strncmp (*argv, "all", wordlen))
+      if (wordlen >= 1 && !strncmp (arg, "all", wordlen))
 	{
 	  /* Apply action to all signals except those used by the
 	     debugger.  Silently skip those.  */
@@ -8562,37 +8543,37 @@ handle_command (char *args, int from_tty)
 	  sigfirst = 0;
 	  siglast = nsigs - 1;
 	}
-      else if (wordlen >= 1 && !strncmp (*argv, "stop", wordlen))
+      else if (wordlen >= 1 && !strncmp (arg, "stop", wordlen))
 	{
 	  SET_SIGS (nsigs, sigs, signal_stop);
 	  SET_SIGS (nsigs, sigs, signal_print);
 	}
-      else if (wordlen >= 1 && !strncmp (*argv, "ignore", wordlen))
+      else if (wordlen >= 1 && !strncmp (arg, "ignore", wordlen))
 	{
 	  UNSET_SIGS (nsigs, sigs, signal_program);
 	}
-      else if (wordlen >= 2 && !strncmp (*argv, "print", wordlen))
+      else if (wordlen >= 2 && !strncmp (arg, "print", wordlen))
 	{
 	  SET_SIGS (nsigs, sigs, signal_print);
 	}
-      else if (wordlen >= 2 && !strncmp (*argv, "pass", wordlen))
+      else if (wordlen >= 2 && !strncmp (arg, "pass", wordlen))
 	{
 	  SET_SIGS (nsigs, sigs, signal_program);
 	}
-      else if (wordlen >= 3 && !strncmp (*argv, "nostop", wordlen))
+      else if (wordlen >= 3 && !strncmp (arg, "nostop", wordlen))
 	{
 	  UNSET_SIGS (nsigs, sigs, signal_stop);
 	}
-      else if (wordlen >= 3 && !strncmp (*argv, "noignore", wordlen))
+      else if (wordlen >= 3 && !strncmp (arg, "noignore", wordlen))
 	{
 	  SET_SIGS (nsigs, sigs, signal_program);
 	}
-      else if (wordlen >= 4 && !strncmp (*argv, "noprint", wordlen))
+      else if (wordlen >= 4 && !strncmp (arg, "noprint", wordlen))
 	{
 	  UNSET_SIGS (nsigs, sigs, signal_print);
 	  UNSET_SIGS (nsigs, sigs, signal_stop);
 	}
-      else if (wordlen >= 4 && !strncmp (*argv, "nopass", wordlen))
+      else if (wordlen >= 4 && !strncmp (arg, "nopass", wordlen))
 	{
 	  UNSET_SIGS (nsigs, sigs, signal_program);
 	}
@@ -8605,11 +8586,11 @@ handle_command (char *args, int from_tty)
 	     SIGHUP, SIGINT, SIGALRM, etc. will work right anyway.  */
 
 	  sigfirst = siglast = (int)
-	    gdb_signal_from_command (atoi (*argv));
-	  if ((*argv)[digits] == '-')
+	    gdb_signal_from_command (atoi (arg));
+	  if (arg[digits] == '-')
 	    {
 	      siglast = (int)
-		gdb_signal_from_command (atoi ((*argv) + digits + 1));
+		gdb_signal_from_command (atoi (arg + digits + 1));
 	    }
 	  if (sigfirst > siglast)
 	    {
@@ -8621,7 +8602,7 @@ handle_command (char *args, int from_tty)
 	}
       else
 	{
-	  oursig = gdb_signal_from_name (*argv);
+	  oursig = gdb_signal_from_name (arg);
 	  if (oursig != GDB_SIGNAL_UNKNOWN)
 	    {
 	      sigfirst = siglast = (int) oursig;
@@ -8629,7 +8610,7 @@ handle_command (char *args, int from_tty)
 	  else
 	    {
 	      /* Not a number and not a recognized flag word => complain.  */
-	      error (_("Unrecognized or ambiguous flag word: \"%s\"."), *argv);
+	      error (_("Unrecognized or ambiguous flag word: \"%s\"."), arg);
 	    }
 	}
 
@@ -8667,8 +8648,6 @@ Are you sure you want to change it? "),
 	      break;
 	    }
 	}
-
-      argv++;
     }
 
   for (signum = 0; signum < nsigs; signum++)
@@ -8689,17 +8668,15 @@ Are you sure you want to change it? "),
 
 	break;
       }
-
-  do_cleanups (old_chain);
 }
 
 /* Complete the "handle" command.  */
 
-static VEC (char_ptr) *
+static void
 handle_completer (struct cmd_list_element *ignore,
+		  completion_tracker &tracker,
 		  const char *text, const char *word)
 {
-  VEC (char_ptr) *vec_signals, *vec_keywords, *return_val;
   static const char * const keywords[] =
     {
       "all",
@@ -8714,13 +8691,8 @@ handle_completer (struct cmd_list_element *ignore,
       NULL,
     };
 
-  vec_signals = signal_completer (ignore, text, word);
-  vec_keywords = complete_on_enum (keywords, word, word);
-
-  return_val = VEC_merge (char_ptr, vec_signals, vec_keywords);
-  VEC_free (char_ptr, vec_signals);
-  VEC_free (char_ptr, vec_keywords);
-  return return_val;
+  signal_completer (ignore, tracker, text, word);
+  complete_on_enum (tracker, keywords, word, word);
 }
 
 enum gdb_signal
@@ -8738,7 +8710,7 @@ Use \"info signals\" for a list of symbolic signals."));
    targets, all signals should be in the signal tables).  */
 
 static void
-signals_info (char *signum_exp, int from_tty)
+info_signals_command (char *signum_exp, int from_tty)
 {
   enum gdb_signal oursig;
 
@@ -9131,32 +9103,6 @@ discard_infcall_control_state (struct infcall_control_state *inf_status)
   xfree (inf_status);
 }
 
-/* restore_inferior_ptid() will be used by the cleanup machinery
-   to restore the inferior_ptid value saved in a call to
-   save_inferior_ptid().  */
-
-static void
-restore_inferior_ptid (void *arg)
-{
-  ptid_t *saved_ptid_ptr = (ptid_t *) arg;
-
-  inferior_ptid = *saved_ptid_ptr;
-  xfree (arg);
-}
-
-/* Save the value of inferior_ptid so that it may be restored by a
-   later call to do_cleanups().  Returns the struct cleanup pointer
-   needed for later doing the cleanup.  */
-
-struct cleanup *
-save_inferior_ptid (void)
-{
-  ptid_t *saved_ptid_ptr = XNEW (ptid_t);
-
-  *saved_ptid_ptr = inferior_ptid;
-  return make_cleanup (restore_inferior_ptid, saved_ptid_ptr);
-}
-
 /* See infrun.h.  */
 
 void
@@ -9254,7 +9200,7 @@ _initialize_infrun (void)
   infrun_async_inferior_event_token
     = create_async_event_handler (infrun_async_inferior_event_handler, NULL);
 
-  add_info ("signals", signals_info, _("\
+  add_info ("signals", info_signals_command, _("\
 What debugger does when program gets various signals.\n\
 Specify a signal as argument to print info on that signal only."));
   add_info_alias ("handle", "signals", 0);

@@ -21,7 +21,7 @@
    see <http://www.gnu.org/licenses/>.  */
 
 #include "sysdep.h"
-#include "dis-asm.h"
+#include "disassemble.h"
 #include "libiberty.h"
 #include "opcode/riscv.h"
 #include "opintl.h"
@@ -471,6 +471,13 @@ print_insn_riscv (bfd_vma memaddr, struct disassemble_info *info)
   else if (riscv_gpr_names == NULL)
     set_default_riscv_dis_options ();
 
+  /* Checks to see if we're inside a R_RISCV_ALIGN, if so */
+  if (info->reloc != NULL && info->reloc->howto->type == R_RISCV_ALIGN)
+    {
+      (*info->fprintf_func) (info->stream, "# R_RISCV_ALIGN");
+      return info->reloc->addend;
+    }
+
   /* Instructions are a sequence of 2-byte packets in little-endian order.  */
   for (n = 0; n < sizeof (insn) && n < riscv_insn_length (insn); n += 2)
     {
@@ -498,7 +505,7 @@ The following RISC-V-specific disassembler options are supported for use\n\
 with the -M switch (multiple options should be separated by commas):\n"));
 
   fprintf (stream, _("\n\
-  numeric       Print numeric reigster names, rather than ABI names.\n"));
+  numeric       Print numeric register names, rather than ABI names.\n"));
 
   fprintf (stream, _("\n\
   no-aliases    Disassemble only into canonical instructions, rather\n\

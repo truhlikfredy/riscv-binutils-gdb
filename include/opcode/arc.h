@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 #ifndef MAX_INSN_FLGS
-#define MAX_INSN_FLGS	     3
+#define MAX_INSN_FLGS	     4
 #endif
 
 /* Instruction Class.  */
@@ -76,6 +76,7 @@ typedef enum
   PMU,
   POP,
   PUSH,
+  SJLI,
   STORE,
   SUB,
   ULTRAIP,

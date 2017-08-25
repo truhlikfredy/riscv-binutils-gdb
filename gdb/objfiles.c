@@ -142,12 +142,19 @@ get_objfile_bfd_data (struct objfile *objfile, struct bfd *abfd)
 	{
 	  storage
 	    = ((struct objfile_per_bfd_storage *)
-	       bfd_zalloc (abfd, sizeof (struct objfile_per_bfd_storage)));
+	       bfd_alloc (abfd, sizeof (struct objfile_per_bfd_storage)));
 	  set_bfd_data (abfd, objfiles_bfd_data, storage);
 	}
       else
-	storage = OBSTACK_ZALLOC (&objfile->objfile_obstack,
-				  struct objfile_per_bfd_storage);
+	{
+	  storage = (objfile_per_bfd_storage *)
+	    obstack_alloc (&objfile->objfile_obstack,
+			   sizeof (objfile_per_bfd_storage));
+	}
+
+      /* objfile_per_bfd_storage is not trivially constructible, must
+	 call the ctor manually.  */
+      storage = new (storage) objfile_per_bfd_storage ();
 
       /* Look up the gdbarch associated with the BFD.  */
       if (abfd != NULL)
@@ -171,7 +178,7 @@ free_objfile_per_bfd_storage (struct objfile_per_bfd_storage *storage)
   bcache_xfree (storage->macro_cache);
   if (storage->demangled_names_hash)
     htab_delete (storage->demangled_names_hash);
-  obstack_free (&storage->storage_obstack, 0);
+  storage->~objfile_per_bfd_storage ();
 }
 
 /* A wrapper for free_objfile_per_bfd_storage that can be passed as a
@@ -369,7 +376,7 @@ struct objfile *
 allocate_objfile (bfd *abfd, const char *name, objfile_flags flags)
 {
   struct objfile *objfile;
-  char *expanded_name;
+  const char *expanded_name;
 
   objfile = XCNEW (struct objfile);
   objfile->psymbol_cache = psymbol_bcache_init ();
@@ -379,22 +386,25 @@ allocate_objfile (bfd *abfd, const char *name, objfile_flags flags)
 
   objfile_alloc_data (objfile);
 
+  gdb::unique_xmalloc_ptr<char> name_holder;
   if (name == NULL)
     {
       gdb_assert (abfd == NULL);
       gdb_assert ((flags & OBJF_NOT_FILENAME) != 0);
-      expanded_name = xstrdup ("<<anonymous objfile>>");
+      expanded_name = "<<anonymous objfile>>";
     }
   else if ((flags & OBJF_NOT_FILENAME) != 0
 	   || is_target_filename (name))
-    expanded_name = xstrdup (name);
+    expanded_name = name;
   else
-    expanded_name = gdb_abspath (name);
+    {
+      name_holder = gdb_abspath (name);
+      expanded_name = name_holder.get ();
+    }
   objfile->original_name
     = (char *) obstack_copy0 (&objfile->objfile_obstack,
 			      expanded_name,
 			      strlen (expanded_name));
-  xfree (expanded_name);
 
   /* Update the per-objfile information that comes from the bfd, ensuring
      that any data that is reference is saved in the per-objfile data

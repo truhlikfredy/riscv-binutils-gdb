@@ -784,9 +784,9 @@ extern void read_frame_arg (struct symbol *sym, struct frame_info *frame,
 extern void read_frame_local (struct symbol *sym, struct frame_info *frame,
 			      struct frame_arg *argp);
 
-extern void args_info (char *, int);
+extern void info_args_command (char *, int);
 
-extern void locals_info (char *, int);
+extern void info_locals_command (char *, int);
 
 extern void return_command (char *, int);
 
@@ -832,6 +832,14 @@ extern struct frame_info *deprecated_safe_get_selected_frame (void);
 /* Create a frame using the specified BASE and PC.  */
 
 extern struct frame_info *create_new_frame (CORE_ADDR base, CORE_ADDR pc);
+
+#if GDB_SELF_TEST
+
+/* Create a frame for unit test.  Its next frame is sentinel frame,
+   created from REGCACHE.  */
+
+extern struct frame_info *create_test_frame (struct regcache *regcache);
+#endif
 
 /* Return true if the frame unwinder for frame FI is UNWINDER; false
    otherwise.  */

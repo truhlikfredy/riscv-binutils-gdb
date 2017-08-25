@@ -7773,10 +7773,15 @@ gdb_print_insn_arm (bfd_vma memaddr, disassemble_info *info)
   else
     info->symbols = NULL;
 
-  if (info->endian == BFD_ENDIAN_BIG)
-    return print_insn_big_arm (memaddr, info);
-  else
-    return print_insn_little_arm (memaddr, info);
+  /* GDB is able to get bfd_mach from the exe_bfd, info->mach is
+     accurate, so mark USER_SPECIFIED_MACHINE_TYPE bit.  Otherwise,
+     opcodes/arm-dis.c:print_insn reset info->mach, and it will trigger
+     the assert on the mismatch of info->mach and bfd_get_mach (exec_bfd)
+     in default_print_insn.  */
+  if (exec_bfd != NULL)
+    info->flags |= USER_SPECIFIED_MACHINE_TYPE;
+
+  return default_print_insn (memaddr, info);
 }
 
 /* The following define instruction sequences that will cause ARM
@@ -9722,7 +9727,7 @@ vfp - VFP co-processor."),
 			   &setdebuglist, &showdebuglist);
 
 #if GDB_SELF_TEST
-  register_self_test (selftests::arm_record_test);
+  selftests::register_test (selftests::arm_record_test);
 #endif
 
 }

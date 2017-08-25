@@ -39,6 +39,7 @@
 #include "observer.h"
 #include "objfiles.h"
 #include "extension.h"
+#include "byte-vector.h"
 
 extern unsigned int overload_debug;
 /* Local functions.  */
@@ -378,6 +379,11 @@ value_cast (struct type *type, struct value *arg2)
     /* We deref the value and then do the cast.  */
     return value_cast (type, coerce_ref (arg2)); 
 
+  /* Strip typedefs / resolve stubs in order to get at the type's
+     code/length, but remember the original type, to use as the
+     resulting type of the cast, in case it was a typedef.  */
+  struct type *to_type = type;
+
   type = check_typedef (type);
   code1 = TYPE_CODE (type);
   arg2 = coerce_ref (arg2);
@@ -433,7 +439,7 @@ value_cast (struct type *type, struct value *arg2)
   code2 = TYPE_CODE (type2);
 
   if (code1 == TYPE_CODE_COMPLEX)
-    return cast_into_complex (type, arg2);
+    return cast_into_complex (to_type, arg2);
   if (code1 == TYPE_CODE_BOOL)
     {
       code1 = TYPE_CODE_INT;
@@ -452,14 +458,14 @@ value_cast (struct type *type, struct value *arg2)
       && (code2 == TYPE_CODE_STRUCT || code2 == TYPE_CODE_UNION)
       && TYPE_NAME (type) != 0)
     {
-      struct value *v = value_cast_structs (type, arg2);
+      struct value *v = value_cast_structs (to_type, arg2);
 
       if (v)
 	return v;
     }
 
   if (code1 == TYPE_CODE_FLT && scalar)
-    return value_from_double (type, value_as_double (arg2));
+    return value_from_double (to_type, value_as_double (arg2));
   else if (code1 == TYPE_CODE_DECFLOAT && scalar)
     {
       enum bfd_endian byte_order = gdbarch_byte_order (get_type_arch (type));
@@ -475,7 +481,7 @@ value_cast (struct type *type, struct value *arg2)
 	/* The only option left is an integral type.  */
 	decimal_from_integral (arg2, dec, dec_len, byte_order);
 
-      return value_from_decfloat (type, dec);
+      return value_from_decfloat (to_type, dec);
     }
   else if ((code1 == TYPE_CODE_INT || code1 == TYPE_CODE_ENUM
 	    || code1 == TYPE_CODE_RANGE)
@@ -496,7 +502,7 @@ value_cast (struct type *type, struct value *arg2)
 		     gdbarch_byte_order (get_type_arch (type2)));
       else
         longest = value_as_long (arg2);
-      return value_from_longest (type, convert_to_boolean ?
+      return value_from_longest (to_type, convert_to_boolean ?
 				 (LONGEST) (longest ? 1 : 0) : longest);
     }
   else if (code1 == TYPE_CODE_PTR && (code2 == TYPE_CODE_INT  
@@ -522,14 +528,14 @@ value_cast (struct type *type, struct value *arg2)
 	      || longest <= -((LONGEST) 1 << addr_bit))
 	    warning (_("value truncated"));
 	}
-      return value_from_longest (type, longest);
+      return value_from_longest (to_type, longest);
     }
   else if (code1 == TYPE_CODE_METHODPTR && code2 == TYPE_CODE_INT
 	   && value_as_long (arg2) == 0)
     {
-      struct value *result = allocate_value (type);
+      struct value *result = allocate_value (to_type);
 
-      cplus_make_method_ptr (type, value_contents_writeable (result), 0, 0);
+      cplus_make_method_ptr (to_type, value_contents_writeable (result), 0, 0);
       return result;
     }
   else if (code1 == TYPE_CODE_MEMBERPTR && code2 == TYPE_CODE_INT
@@ -537,7 +543,7 @@ value_cast (struct type *type, struct value *arg2)
     {
       /* The Itanium C++ ABI represents NULL pointers to members as
 	 minus one, instead of biasing the normal case.  */
-      return value_from_longest (type, -1);
+      return value_from_longest (to_type, -1);
     }
   else if (code1 == TYPE_CODE_ARRAY && TYPE_VECTOR (type)
 	   && code2 == TYPE_CODE_ARRAY && TYPE_VECTOR (type2)
@@ -548,21 +554,21 @@ value_cast (struct type *type, struct value *arg2)
     error (_("can only cast scalar to vector of same size"));
   else if (code1 == TYPE_CODE_VOID)
     {
-      return value_zero (type, not_lval);
+      return value_zero (to_type, not_lval);
     }
   else if (TYPE_LENGTH (type) == TYPE_LENGTH (type2))
     {
       if (code1 == TYPE_CODE_PTR && code2 == TYPE_CODE_PTR)
-	return value_cast_pointers (type, arg2, 0);
+	return value_cast_pointers (to_type, arg2, 0);
 
       arg2 = value_copy (arg2);
-      deprecated_set_value_type (arg2, type);
-      set_value_enclosing_type (arg2, type);
+      deprecated_set_value_type (arg2, to_type);
+      set_value_enclosing_type (arg2, to_type);
       set_value_pointed_to_offset (arg2, 0);	/* pai: chk_val */
       return arg2;
     }
   else if (VALUE_LVAL (arg2) == lval_memory)
-    return value_at_lazy (type, value_address (arg2));
+    return value_at_lazy (to_type, value_address (arg2));
   else
     {
       error (_("Invalid cast."));
@@ -958,7 +964,7 @@ value_at_lazy (struct type *type, CORE_ADDR addr)
 }
 
 void
-read_value_memory (struct value *val, LONGEST embedded_offset,
+read_value_memory (struct value *val, LONGEST bit_offset,
 		   int stack, CORE_ADDR memaddr,
 		   gdb_byte *buffer, size_t length)
 {
@@ -984,8 +990,9 @@ read_value_memory (struct value *val, LONGEST embedded_offset,
       if (status == TARGET_XFER_OK)
 	/* nothing */;
       else if (status == TARGET_XFER_UNAVAILABLE)
-	mark_value_bytes_unavailable (val, embedded_offset + xfered_total,
-				      xfered_partial);
+	mark_value_bits_unavailable (val, (xfered_total * HOST_CHAR_BIT
+					   + bit_offset),
+				     xfered_partial * HOST_CHAR_BIT);
       else if (status == TARGET_XFER_EOF)
 	memory_error (TARGET_XFER_E_IO, memaddr + xfered_total);
       else
@@ -2075,24 +2082,20 @@ search_struct_method (const char *name, struct value **arg1p,
 
 	  if (offset < 0 || offset >= TYPE_LENGTH (type))
 	    {
-	      gdb_byte *tmp;
-	      struct cleanup *back_to;
 	      CORE_ADDR address;
 
-	      tmp = (gdb_byte *) xmalloc (TYPE_LENGTH (baseclass));
-	      back_to = make_cleanup (xfree, tmp);
+	      gdb::byte_vector tmp (TYPE_LENGTH (baseclass));
 	      address = value_address (*arg1p);
 
 	      if (target_read_memory (address + offset,
-				      tmp, TYPE_LENGTH (baseclass)) != 0)
+				      tmp.data (), TYPE_LENGTH (baseclass)) != 0)
 		error (_("virtual baseclass botch"));
 
 	      base_val = value_from_contents_and_address (baseclass,
-							  tmp,
+							  tmp.data (),
 							  address + offset);
 	      base_valaddr = value_contents_for_printing (base_val);
 	      this_offset = 0;
-	      do_cleanups (back_to);
 	    }
 	  else
 	    {

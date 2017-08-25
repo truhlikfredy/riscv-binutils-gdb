@@ -1588,7 +1588,7 @@ sparc_execute_dwarf_cfa_vendor_op (struct gdbarch *gdbarch, gdb_byte op,
   uint64_t reg;
   int size = register_size (gdbarch, 0);
 
-  dwarf2_frame_state_alloc_regs (&fs->regs, 32);
+  fs->regs.alloc_regs (32);
   for (reg = 8; reg < 16; reg++)
     {
       fs->regs.reg[reg].how = DWARF2_FRAME_REG_SAVED_REG;
@@ -1855,8 +1855,6 @@ sparc32_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   set_gdbarch_frame_args_skip (gdbarch, 8);
 
-  set_gdbarch_print_insn (gdbarch, print_insn_sparc);
-
   set_gdbarch_software_single_step (gdbarch, sparc_software_single_step);
   set_gdbarch_write_pc (gdbarch, sparc_write_pc);
 
@@ -1908,7 +1906,7 @@ sparc32_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
         }
 
       /* Target description may have changed. */
-      info.tdep_info = tdesc_data;
+      info.tdesc_data = tdesc_data;
       tdesc_use_registers (gdbarch, tdesc, tdesc_data);
     }
 

@@ -120,7 +120,7 @@ set_gdb_data_directory (const char *new_datadir)
     warning (_("%s is not a directory."), new_datadir);
 
   xfree (gdb_datadir);
-  gdb_datadir = gdb_realpath (new_datadir);
+  gdb_datadir = gdb_realpath (new_datadir).release ();
 
   /* gdb_realpath won't return an absolute path if the path doesn't exist,
      but we still want to record an absolute path here.  If the user entered
@@ -128,10 +128,10 @@ set_gdb_data_directory (const char *new_datadir)
      isn't canonical, but that's ok.  */
   if (!IS_ABSOLUTE_PATH (gdb_datadir))
     {
-      char *abs_datadir = gdb_abspath (gdb_datadir);
+      gdb::unique_xmalloc_ptr<char> abs_datadir = gdb_abspath (gdb_datadir);
 
       xfree (gdb_datadir);
-      gdb_datadir = abs_datadir;
+      gdb_datadir = abs_datadir.release ();
     }
 }
 
@@ -224,7 +224,7 @@ get_init_files (const char **system_gdbinit,
 	    {
 	      /* Append the part of SYSTEM_GDBINIT that follows GDB_DATADIR
 		 to gdb_datadir.  */
-	      char *tmp_sys_gdbinit = xstrdup (SYSTEM_GDBINIT + datadir_len);
+	      char *tmp_sys_gdbinit = xstrdup (&SYSTEM_GDBINIT[datadir_len]);
 	      char *p;
 
 	      for (p = tmp_sys_gdbinit; IS_DIR_SEPARATOR (*p); ++p)
@@ -1083,7 +1083,8 @@ captured_main_1 (struct captured_main_args *context)
      the same as the $HOME/.gdbinit file (it should exist, also).  */
   if (local_gdbinit)
     {
-      auto_load_local_gdbinit_pathname = gdb_realpath (local_gdbinit);
+      auto_load_local_gdbinit_pathname
+	= gdb_realpath (local_gdbinit).release ();
 
       if (!inhibit_gdbinit && auto_load_local_gdbinit
 	  && file_is_auto_load_safe (local_gdbinit,

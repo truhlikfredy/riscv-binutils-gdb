@@ -2134,7 +2134,7 @@ nds32_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   nds32_add_reggroups (gdbarch);
 
   /* Hook in ABI-specific overrides, if they have been registered.  */
-  info.tdep_info = (void *) tdesc_data;
+  info.tdesc_data = tdesc_data;
   gdbarch_init_osabi (info, gdbarch);
 
   /* Override tdesc_register callbacks for system registers.  */
@@ -2160,8 +2160,6 @@ nds32_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   set_gdbarch_frame_align (gdbarch, nds32_frame_align);
   frame_base_set_default (gdbarch, &nds32_frame_base);
-
-  set_gdbarch_print_insn (gdbarch, print_insn_nds32);
 
   /* Handle longjmp.  */
   set_gdbarch_get_longjmp_target (gdbarch, nds32_get_longjmp_target);

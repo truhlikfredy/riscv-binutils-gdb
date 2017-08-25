@@ -134,7 +134,7 @@ static const bfd_vma ppc_elf_vxworks_pic_plt0_entry
 #define VXWORKS_PLT_NON_JMP_SLOT_RELOCS 3
 /* The number of relocations in the PLTResolve slot. */
 #define VXWORKS_PLTRESOLVE_RELOCS 2
-/* The number of relocations in the PLTResolve slot when when creating
+/* The number of relocations in the PLTResolve slot when creating
    a shared library. */
 #define VXWORKS_PLTRESOLVE_RELOCS_SHLIB 0
 
@@ -2849,7 +2849,7 @@ ppc_elf_begin_write_processing (bfd *abfd, struct bfd_link_info *link_info)
     free (buffer);
 
   if (error_message)
-    _bfd_error_handler (error_message, ibfd, APUINFO_SECTION_NAME);
+    _bfd_error_handler (error_message, APUINFO_SECTION_NAME, ibfd);
 }
 
 /* Prevent the output section from accumulating the input sections'
@@ -4906,9 +4906,9 @@ ppc_elf_merge_private_bfd_data (bfd *ibfd, struct bfd_link_info *info)
 	  error = TRUE;
 	  _bfd_error_handler
 	    /* xgettext:c-format */
-	    (_("%B: uses different e_flags (0x%lx) fields "
-	       "than previous modules (0x%lx)"),
-	     ibfd, (long) new_flags, (long) old_flags);
+	    (_("%B: uses different e_flags (%#x) fields "
+	       "than previous modules (%#x)"),
+	     ibfd, new_flags, old_flags);
 	}
 
       if (error)
@@ -5942,17 +5942,18 @@ allocate_got (struct ppc_elf_link_hash_table *htab, unsigned int need)
   return where;
 }
 
-/* If H is undefined weak, make it dynamic if that makes sense.  */
+/* If H is undefined, make it dynamic if that makes sense.  */
 
 static bfd_boolean
-ensure_undefweak_dynamic (struct bfd_link_info *info,
-			  struct elf_link_hash_entry *h)
+ensure_undef_dynamic (struct bfd_link_info *info,
+		      struct elf_link_hash_entry *h)
 {
   struct elf_link_hash_table *htab = elf_hash_table (info);
 
   if (htab->dynamic_sections_created
-      && info->dynamic_undefined_weak != 0
-      && h->root.type == bfd_link_hash_undefweak
+      && ((info->dynamic_undefined_weak != 0
+	   && h->root.type == bfd_link_hash_undefweak)
+	  || h->root.type == bfd_link_hash_undefined)
       && h->dynindx == -1
       && !h->forced_local
       && ELF_ST_VISIBILITY (h->other) == STV_DEFAULT)
@@ -5986,9 +5987,8 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
     {
       unsigned int need;
 
-      /* Make sure this symbol is output as a dynamic symbol.
-	 Undefined weak syms won't yet be marked as dynamic.  */
-      if (!ensure_undefweak_dynamic (info, &eh->elf))
+      /* Make sure this symbol is output as a dynamic symbol.  */
+      if (!ensure_undef_dynamic (info, &eh->elf))
 	return FALSE;
 
       need = 0;
@@ -6102,9 +6102,8 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
 
       if (eh->dyn_relocs != NULL)
 	{
-	  /* Make sure undefined weak symbols are output as a dynamic
-	     symbol in PIEs.  */
-	  if (!ensure_undefweak_dynamic (info, h))
+	  /* Make sure this symbol is output as a dynamic symbol.  */
+	  if (!ensure_undef_dynamic (info, h))
 	    return FALSE;
 	}
     }
@@ -6120,9 +6119,8 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
 	       && eh->has_addr16_lo
 	       && htab->params->pic_fixup > 0))
 	{
-	  /* Make sure this symbol is output as a dynamic symbol.
-	     Undefined weak syms won't yet be marked as dynamic.  */
-	  if (!ensure_undefweak_dynamic (info, h))
+	  /* Make sure this symbol is output as a dynamic symbol.  */
+	  if (!ensure_undef_dynamic (info, h))
 	    return FALSE;
 
 	  if (h->dynindx == -1)
@@ -8284,9 +8282,9 @@ ppc_elf_relocate_section (bfd *output_bfd,
 		  r_type = R_PPC_GOT16_LO;
 		}
 	      else
-		info->callbacks->einfo
+		_bfd_error_handler
 		  /* xgettext:c-format */
-		  (_("%H: error: %s with unexpected instruction %x\n"),
+		  (_("%B(%A+%#Lx): error: %s with unexpected instruction %#x"),
 		   input_bfd, input_section, rel->r_offset,
 		   "R_PPC_ADDR16_HA", insn);
 	    }
@@ -8319,9 +8317,9 @@ ppc_elf_relocate_section (bfd *output_bfd,
 		  rel->r_info = ELF32_R_INFO (0, r_type);
 		}
 	      else
-		info->callbacks->einfo
+		_bfd_error_handler
 		  /* xgettext:c-format */
-		  (_("%H: error: %s with unexpected instruction %x\n"),
+		  (_("%B(%A+%#Lx): error: %s with unexpected instruction %#x"),
 		   input_bfd, input_section, rel->r_offset,
 		   "R_PPC_ADDR16_LO", insn);
 	    }
@@ -8639,10 +8637,6 @@ ppc_elf_relocate_section (bfd *output_bfd,
 		    else
 		      {
 			bfd_vma value = relocation;
-			int tlsopt = (htab->plt_type == PLT_NEW
-				      && !htab->params->no_tls_get_addr_opt
-				      && htab->tls_get_addr != NULL
-				      && htab->tls_get_addr->plt.plist != NULL);
 
 			if (tls_ty != 0)
 			  {
@@ -8654,8 +8648,7 @@ ppc_elf_relocate_section (bfd *output_bfd,
 				  value = 0;
 				else
 				  value -= htab->elf.tls_sec->vma + DTP_OFFSET;
-				if ((tls_ty & TLS_TPREL)
-				    || (tlsopt && !(tls_ty & TLS_DTPREL)))
+				if (tls_ty & TLS_TPREL)
 				  value += DTP_OFFSET - TP_OFFSET;
 			      }
 
@@ -8663,7 +8656,7 @@ ppc_elf_relocate_section (bfd *output_bfd,
 			      {
 				bfd_put_32 (input_bfd, value,
 					    htab->elf.sgot->contents + off + 4);
-				value = !tlsopt;
+				value = 1;
 			      }
 			  }
 			bfd_put_32 (input_bfd, value,
@@ -9007,34 +9000,6 @@ ppc_elf_relocate_section (bfd *output_bfd,
 		  addend = 0;
 		  break;
 		}
-	    }
-	  else if (r_type == R_PPC_DTPMOD32
-		   && htab->plt_type == PLT_NEW
-		   && !htab->params->no_tls_get_addr_opt
-		   && htab->tls_get_addr != NULL
-		   && htab->tls_get_addr->plt.plist != NULL)
-	    {
-	      /* Set up for __tls_get_addr_opt stub when this entry
-		 does not have dynamic relocs.  */
-	      relocation = 0;
-	      /* Set up the next word for local dynamic.  If it turns
-		 out to be global dynamic, the reloc will overwrite
-		 this value.  */
-	      if (rel->r_offset + 8 <= input_section->size)
-		bfd_put_32 (input_bfd, DTP_OFFSET - TP_OFFSET,
-			    contents + rel->r_offset + 4);
-	    }
-	  else if (r_type == R_PPC_DTPREL32
-		   && htab->plt_type == PLT_NEW
-		   && !htab->params->no_tls_get_addr_opt
-		   && htab->tls_get_addr != NULL
-		   && htab->tls_get_addr->plt.plist != NULL
-		   && rel > relocs
-		   && rel[-1].r_info == ELF32_R_INFO (r_symndx, R_PPC_DTPMOD32)
-		   && rel[-1].r_offset + 4 == rel->r_offset)
-	    {
-	      /* __tls_get_addr_opt stub value.  */
-	      addend += DTP_OFFSET - TP_OFFSET;
 	    }
 	  break;
 

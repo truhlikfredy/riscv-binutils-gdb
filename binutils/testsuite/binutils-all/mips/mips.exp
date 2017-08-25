@@ -27,9 +27,19 @@ if [is_remote host] {
     set copyfile tmpdir/copy
 }
 
+set has_newabi [expr [istarget *-*-irix6*] \
+		     || [istarget mips*-*-linux*] \
+		     || [istarget mips*-sde-elf*] \
+		     || [istarget mips*-mti-elf*] \
+		     || [istarget mips*-img-elf*]]
+
 run_dump_test "mips-ase-1"
 run_dump_test "mips-ase-2"
 run_dump_test "mips-ase-3"
+run_dump_test "mips-xpa-virt-1"
+run_dump_test "mips-xpa-virt-2"
+run_dump_test "mips-xpa-virt-3"
+run_dump_test "mips-xpa-virt-4"
 run_dump_test "mixed-mips16"
 run_dump_test "mixed-micromips"
 run_dump_test "mixed-mips16-micromips"
@@ -41,3 +51,12 @@ run_dump_test "mips16-extend-insn"
 run_dump_test "mips16e2-extend-insn"
 run_dump_test "mips16-alias"
 run_dump_test "mips16-noalias"
+
+run_dump_test "mips-note-2"
+run_dump_test "mips-note-2r"
+if $has_newabi {
+    run_dump_test "mips-note-2-n32"
+    run_dump_test "mips-note-2-n64"
+    run_dump_test "mips-note-2r-n32"
+    run_dump_test "mips-note-2r-n64"
+}
