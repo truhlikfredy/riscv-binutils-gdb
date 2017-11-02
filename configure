@@ -2968,6 +2968,11 @@ case "${ENABLE_GOLD}" in
             is_elf=yes
             ;;
         esac
+        ;;
+      # [GNU MCU Eclipse]
+      riscv-none-embed)
+        is_elf=yes
+        ;;
     esac
 
     if test "$is_elf" = "yes"; then

@@ -1458,6 +1458,12 @@ case "${targ}" in
     targ_selvecs="riscv_elf32_vec riscv_elf64_vec"
     want64=true
     ;;
+  # [GNU MCU Eclipse]
+  riscv-*-*)
+    targ_defvec=riscv_elf64_vec
+    targ_selvecs="riscv_elf32_vec riscv_elf64_vec"
+    want64=true
+    ;;
 #endif
 
   rl78-*-elf)
