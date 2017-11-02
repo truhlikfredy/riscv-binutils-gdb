@@ -304,6 +304,12 @@ register_name (struct gdbarch *gdbarch,
   if (regnum >= RISCV_ZERO_REGNUM && regnum <= RISCV_LAST_FP_REGNUM)
       return riscv_gdb_reg_names[regnum];
 
+// [GNU MCU Eclipse]
+#if 1
+  if (regnum >= RISCV_FIRST_CSR_REGNUM)
+    return "-";
+#endif
+
   if (regnum >= RISCV_FIRST_CSR_REGNUM && regnum <= RISCV_LAST_CSR_REGNUM)
     {
       sprintf(buf, "csr%d", regnum - RISCV_FIRST_CSR_REGNUM);

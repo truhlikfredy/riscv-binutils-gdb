@@ -1010,11 +1010,20 @@ mi_cmd_data_list_register_names (const char *command, char **argv, int argc)
 	   regnum < numregs;
 	   regnum++)
 	{
+#if 1
+// [GNU MCU Eclipse]
+        const char *name = gdbarch_register_name(gdbarch, regnum);
+        if (name == NULL || *name == '\0')
+          uiout->field_string (NULL, "");
+        else if (*name != '-')
+          uiout->field_string (NULL, name);
+#else
 	  if (gdbarch_register_name (gdbarch, regnum) == NULL
 	      || *(gdbarch_register_name (gdbarch, regnum)) == '\0')
 	    uiout->field_string (NULL, "");
 	  else
 	    uiout->field_string (NULL, gdbarch_register_name (gdbarch, regnum));
+#endif
 	}
     }
 
