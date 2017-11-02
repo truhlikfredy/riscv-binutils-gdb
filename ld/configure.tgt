@@ -702,6 +702,10 @@ riscv32*-*-*)		targ_emul=elf32lriscv
 riscv64*-*-*)		targ_emul=elf64lriscv
 			targ_extra_emuls="elf32lriscv"
 			targ_extra_libpath=$targ_extra_emuls ;;
+# [GNU MCU Eclipse]
+riscv*-*-*)		targ_emul=elf64lriscv
+			targ_extra_emuls="elf32lriscv"
+			targ_extra_libpath=$targ_extra_emuls ;;
 rs6000-*-aix[5-9]*)	targ_emul=aix5rs6 ;;
 rs6000-*-aix*)		targ_emul=aixrs6
 			;;
