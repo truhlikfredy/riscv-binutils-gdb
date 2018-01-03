@@ -1185,6 +1185,25 @@ my_getSmallExpression (expressionS *ep, bfd_reloc_code_real_type *reloc,
   return reloc_index;
 }
 
+/* Detect and handle implicitly zero load-store offsets.  For example,
+   "lw t0, (t1)" is shorthand for "lw t0, 0(t1)".  Return TRUE iff such
+   an implicit offset was detected.  */
+
+static bfd_boolean
+riscv_handle_implicit_zero_offset (expressionS *expr, const char *s)
+{
+  /* Check whether there is only a single bracketed expression left.
+     If so, it must be the base register and the constant must be zero.  */
+  if (*s == '(' && strchr (s + 1, '(') == 0)
+    {
+      expr->X_op = O_constant;
+      expr->X_add_number = 0;
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
 /* This routine assembles an instruction into its binary format.  As a
    side effect, it sets the global variable imm_reloc to the type of
    relocation to do if one of the operands is an address expression.  */
@@ -1325,6 +1344,8 @@ rvc_imm_done:
 		  ip->insn_opcode |= ENCODE_RVC_IMM (imm_expr->X_add_number);
 		  goto rvc_imm_done;
 		case 'k':
+		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
+		    continue;
 		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
 		      || imm_expr->X_op != O_constant
 		      || !VALID_RVC_LW_IMM (imm_expr->X_add_number))
@@ -1332,6 +1353,8 @@ rvc_imm_done:
 		  ip->insn_opcode |= ENCODE_RVC_LW_IMM (imm_expr->X_add_number);
 		  goto rvc_imm_done;
 		case 'l':
+		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
+		    continue;
 		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
 		      || imm_expr->X_op != O_constant
 		      || !VALID_RVC_LD_IMM (imm_expr->X_add_number))
@@ -1339,6 +1362,8 @@ rvc_imm_done:
 		  ip->insn_opcode |= ENCODE_RVC_LD_IMM (imm_expr->X_add_number);
 		  goto rvc_imm_done;
 		case 'm':
+		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
+		    continue;
 		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
 		      || imm_expr->X_op != O_constant
 		      || !VALID_RVC_LWSP_IMM (imm_expr->X_add_number))
@@ -1347,6 +1372,8 @@ rvc_imm_done:
 		    ENCODE_RVC_LWSP_IMM (imm_expr->X_add_number);
 		  goto rvc_imm_done;
 		case 'n':
+		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
+		    continue;
 		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
 		      || imm_expr->X_op != O_constant
 		      || !VALID_RVC_LDSP_IMM (imm_expr->X_add_number))
@@ -1357,6 +1384,9 @@ rvc_imm_done:
 		case 'o':
 		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
 		      || imm_expr->X_op != O_constant
+		      /* C.addiw, c.li, and c.andi allow zero immediate.
+			 C.addi allows zero immediate as hint.  Otherwise this
+			 is same as 'j'.  */
 		      || !VALID_RVC_IMM (imm_expr->X_add_number))
 		    break;
 		  ip->insn_opcode |= ENCODE_RVC_IMM (imm_expr->X_add_number);
@@ -1380,6 +1410,8 @@ rvc_imm_done:
 		    ENCODE_RVC_ADDI16SP_IMM (imm_expr->X_add_number);
 		  goto rvc_imm_done;
 		case 'M':
+		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
+		    continue;
 		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
 		      || imm_expr->X_op != O_constant
 		      || !VALID_RVC_SWSP_IMM (imm_expr->X_add_number))
@@ -1388,6 +1420,8 @@ rvc_imm_done:
 		    ENCODE_RVC_SWSP_IMM (imm_expr->X_add_number);
 		  goto rvc_imm_done;
 		case 'N':
+		  if (riscv_handle_implicit_zero_offset (imm_expr, s))
+		    continue;
 		  if (my_getSmallExpression (imm_expr, imm_reloc, s, p)
 		      || imm_expr->X_op != O_constant
 		      || !VALID_RVC_SDSP_IMM (imm_expr->X_add_number))
@@ -1618,12 +1652,7 @@ rvc_lui:
 	      p = percent_op_rtype;
 	      *imm_reloc = BFD_RELOC_UNUSED;
 load_store:
-	      /* Check whether there is only a single bracketed expression
-		 left.  If so, it must be the base register and the
-		 constant must be zero.  */
-	      imm_expr->X_op = O_constant;
-	      imm_expr->X_add_number = 0;
-	      if (*s == '(' && strchr (s + 1, '(') == 0)
+	      if (riscv_handle_implicit_zero_offset (imm_expr, s))
 		continue;
 alu_op:
 	      /* If this value won't fit into a 16 bit offset, then go
@@ -2293,9 +2322,17 @@ bfd_boolean
 riscv_frag_align_code (int n)
 {
   bfd_vma bytes = (bfd_vma) 1 << n;
-  bfd_vma worst_case_bytes = bytes - (riscv_opts.rvc ? 2 : 4);
-  char *nops = frag_more (worst_case_bytes);
+  bfd_vma insn_alignment = riscv_opts.rvc ? 2 : 4;
+  bfd_vma worst_case_bytes = bytes - insn_alignment;
+  char *nops;
   expressionS ex;
+
+  /* If we are moving to a smaller alignment than the instruction size, then no
+     alignment is required. */
+  if (bytes <= insn_alignment)
+    return TRUE;
+
+  nops = frag_more (worst_case_bytes);
 
   /* When not relaxing, riscv_handle_align handles code alignment.  */
   if (!riscv_opts.relax)

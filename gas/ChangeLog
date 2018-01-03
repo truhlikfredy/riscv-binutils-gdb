@@ -1,3 +1,91 @@
+2017-12-28  Jim Wilson  <jimw@sifive.com>
+
+	* testsuite/gas/riscv/priv-reg.d, testsuite/gas/riscv/priv-reg.s: New.
+
+2017-12-20  Jim Wilson  <jimw@sifive.com>
+
+	* config/tc-riscv.c (risc_ip) <o>: Add comment.
+	* testsuite/gas/riscv/c-nonzero-imm.d,
+	* testsuite/gas/riscv/c-nonzero-imm.l,
+	* testsuite/gas/riscv/c-nonzero-imm.s,
+	* testsuite/gas/riscv/c-nonzero-reg.d,
+	* testsuite/gas/riscv/c-nonzero-reg.l,
+	* testsuite/gas/riscv/c-nonzero-reg.s,
+	* testsuite/gas/riscv/c-zero-imm-64.d,
+	* testsuite/gas/riscv/c-zero-imm-64.s,
+	* testsuite/gas/riscv/c-zero-imm.d, testsuite/gas/riscv/c-zero-imm.s,
+	* testsuite/gas/riscv/c-zero-reg.d,
+	* testsuite/gas/riscv/c-zero-reg.s: New.
+
+2017-12-13  Jim Wilson  <jimw@sifive.com>
+
+	PR 22599
+	* testsuite/gas/riscv/fsxxi.d, testsuite/gas/riscv/fsxxi.s: New.
+
+2017-12-03  Jim Wilson  <jimw@sifive.com>
+
+	* doc/c-riscv.texi (RISC-V-Directives): Move @section immediately after
+	@node.
+
+2017-12-01  Palmer Dabbelt  <palmer@sifive.com>
+	    Jim Wilson  <jimw@sifive.com>
+
+	* doc/as.texinfo (RISC-V): Alphabetize RISC-V entries.  Change
+	RISC-V-Opts to RISC-V-Options.  Delete redundant space.  Add -fpic
+	and related options to option list.
+	* doc/c-riscv.texi: (RISC-V-Options): Renamed from RISC-V-Opts.
+	(RISC-V Options): Renamed from Options.  Add missing period.
+	(-fpic): Also mention -fPIC.
+	(RISC-V Directives): New node.
+
+2017-11-29  Jim Wilson  <jimw@sifive.com>
+	    Palmer Dabbelt  <palmer@sifive.com>
+
+	* config/tc-riscv.c (riscv_frag_align_code): New local insn_alignment.
+	Early return if bytes less than or equal to insn_alignment.
+	* testsuite/gas/riscv/align-1.l: New.
+	* testsuite/gas/riscv/align-1.s: New.
+	* testsuite/gas/riscv/riscv.exp: Use run_dump_tests.  Use run_list_test
+	for align-1.
+
+	PR gas/22464
+	* doc/c-i386.texi (-n): Clarify docs.
+
+2017-11-29  Jim Wilson  <jimw@sifive.com>
+
+	* config/tc-riscv.c (riscv_frag_align_code): New local insn_alignment.
+	Early return if bytes less than or equal to insn_alignment.
+	* testsuite/gas/riscv/align-1.l: New.
+	* testsuite/gas/riscv/align-1.s: New.
+	* testsuite/gas/riscv/riscv.exp: Use run_dump_tests.  Use run_list_test
+	for align-1.
+
+2017-09-27  Nick Clifton  <nickc@redhat.com>
+
+	PR 22179
+	* testsuite/gas/riscv/fmv.x.s: New file: Tests the support for the
+	renamed fmv.x.s and fmv.s.x instructions.
+	* testsuite/gas/riscv/fmv.x.d: New file: Test driver.
+
+2017-11-14  Jim Wilson  <jimw@sifive.com>
+
+	* testsuite/gas/lns/lns.exp (lns-common-1): Add riscv*-*-* to alt list.
+
+2017-11-07  Jim Wilson  <jimw@sifive.com>
+
+	* config/tc-riscv.c (append_insn): Call frag_wane and frag_new at
+	end for linker optimizable relocs.
+	* testsuite/gas/riscv/eh-relocs.d: New.
+	* testsuite/gas/riscv/eh-relocs.s: New.
+	* testsuite/gas/riscv/riscv.exp: Run eh-relocs test.
+
+2017-11-07  Palmer Dabbelt  <palmer@dabbelt.com>
+
+	* testsuite/gas/riscv/satp.d: New test.
+	testsuite/gas/riscv/satp.s: Likewise.
+	testsuite/gas/riscv/riscv.exp: Likewise.
+	config/tc-riscv.c (md_begin): Handle CSR aliases.
+
 2017-11-07  Jim Wilson  <jimw@sifive.com>
 
 	* config/tc-riscv.c (append_insn): Call frag_wane and frag_new at

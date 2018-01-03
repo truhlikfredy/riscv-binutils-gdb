@@ -1,3 +1,15 @@
+2017-12-28  Jim Wilson  <jimw@sifive.com>
+
+	* opcode/riscv-opc.h (DECLARE_CSR): Add missing privileged registers.
+	Sort to match privileged spec documentation order.
+	(DECLARE_CSR_ALIAS): Add ubadaddr, and comments.
+
+2017-11-07  Palmer Dabbelt  <palmer@dabbelt.com>
+
+	* opcode/riscv-opc.h (sptbr): Rename to satp.
+	(CSR_SPTBR): Rename to CSR_SATP.
+	(sptbr): Alias to CSR_SATP.
+
 2017-11-07  Palmer Dabbelt  <palmer@dabbelt.com>
 
 	* opcode/riscv-opc.h (sptbr): Rename to satp.

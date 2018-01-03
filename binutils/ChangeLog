@@ -1,3 +1,25 @@
+2017-12-06  Jim Wilson  <jimw@sifive.com>
+
+	PR 22465
+	* objcopy.c (copy_section): New local extra.  If isection->lma not
+	exactly divisible by interleave, then bias from.  Also adjust
+	osection->lma if necessary.
+
+2017-11-10  Jim Wilson  <jimw@sifive.com>
+
+	* testsuite/binutils-all/objdump.exp: Expect the debug_ranges test to
+	pass.
+
+2017-11-07  Jim Wilson  <jimw@sifive.com>
+
+	* MAINTAINERS (RISC-V): Fix typo in my email address.
+
+2017-11-07  Palmer Dabbelt  <palmer@sifive.com>
+
+	* MAINTAINERS (RISC-V): Add Jim Wilson as a maintainer.
+	Clean up Andrew's entry (remove trailing space, add tabs).
+	Change Palmer's email address, and clean up entry (add tabs).
+
 2017-07-24  Tristan Gingold  <gingold@adacore.com>
 
 	* configure: Regenerate.

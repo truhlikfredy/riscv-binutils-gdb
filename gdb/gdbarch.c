@@ -124,6 +124,19 @@ pstring_list (const char *const *list)
 
 /* Maintain the struct gdbarch object.  */
 
+/**
+ * Note that it is normal during GDB operation that several different gdbarch
+ * objects are in use, which have somewhat different contents and are used for
+ * different purposes.
+ *
+ * In particular, there are gdbarch objects that describe a *target* (i.e. an
+ * inferior GDB is operating on) -- those use target descriptions, and care
+ * about registers etc.
+ *
+ * But then there are also gdbarch objects that are used solely when looking at
+ * an *object file*, without involving any connection to a target -- those
+ * don't have target descriptions, and don't care about registers.
+ */
 struct gdbarch
 {
   /* Has this architecture been fully initialized?  */
@@ -2036,7 +2049,8 @@ gdbarch_num_regs (struct gdbarch *gdbarch)
   /* Check variable changed from pre-default.  */
   gdb_assert (gdbarch->num_regs != -1);
   if (gdbarch_debug >= 2)
-    fprintf_unfiltered (gdb_stdlog, "gdbarch_num_regs called\n");
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_num_regs called -> %d\n",
+                        gdbarch->num_regs);
   return gdbarch->num_regs;
 }
 
@@ -2044,6 +2058,9 @@ void
 set_gdbarch_num_regs (struct gdbarch *gdbarch,
                       int num_regs)
 {
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "set_gdbarch_num_regs(%d) called\n",
+                        num_regs);
   gdbarch->num_regs = num_regs;
 }
 
@@ -2053,7 +2070,8 @@ gdbarch_num_pseudo_regs (struct gdbarch *gdbarch)
   gdb_assert (gdbarch != NULL);
   /* Skip verify of num_pseudo_regs, invalid_p == 0 */
   if (gdbarch_debug >= 2)
-    fprintf_unfiltered (gdb_stdlog, "gdbarch_num_pseudo_regs called\n");
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_num_pseudo_regs called -> %d\n",
+                        gdbarch->num_pseudo_regs);
   return gdbarch->num_pseudo_regs;
 }
 
@@ -3569,7 +3587,8 @@ gdbarch_register_reggroup_p (struct gdbarch *gdbarch, int regnum, struct reggrou
   gdb_assert (gdbarch != NULL);
   gdb_assert (gdbarch->register_reggroup_p != NULL);
   if (gdbarch_debug >= 2)
-    fprintf_unfiltered (gdb_stdlog, "gdbarch_register_reggroup_p called\n");
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_register_reggroup_p(%d, %p) called\n",
+                        regnum, reggroup);
   return gdbarch->register_reggroup_p (gdbarch, regnum, reggroup);
 }
 
