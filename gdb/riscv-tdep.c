@@ -2777,6 +2777,16 @@ riscv_frame_cache (struct frame_info *this_frame, void **this_cache)
   /* Scan the prologue, filling in the cache.  */
   start_addr = get_frame_func (this_frame);
   pc = get_frame_pc (this_frame);
+
+  // Anton's ugly hack to avoid the edge case reads between 0-100 addresses
+  if (start_addr == 0) 
+  {
+    fprintf_unfiltered(gdb_stdlog, "The riscv_frame_cache's start_addr is 0 (from the get_frame_func).\n");
+    fprintf_unfiltered(gdb_stdlog, "Forcing it to the value of the PC (%s) to avoid the riscv_scan_prologue reading between 0-99 addresses.\n", core_addr_to_string(pc));
+    start_addr = pc;
+  }
+  // Hack end
+
   riscv_scan_prologue (gdbarch, start_addr, pc, cache);
 
   /* We can now calculate the frame base address.  */
