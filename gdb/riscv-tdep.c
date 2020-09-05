@@ -1180,6 +1180,16 @@ riscv_frame_cache (struct frame_info *this_frame, void **this_cache)
   pc = get_frame_pc (this_frame);
   find_pc_partial_function (pc, NULL, &start_addr, NULL);
   stack_addr = get_frame_register_signed (this_frame, RISCV_SP_REGNUM);
+
+  // Hack start - avoid the zero start_addr forcefuly
+  if (start_addr == 0) 
+  {
+    fprintf_unfiltered(gdb_stdlog, "The riscv_frame_cache's start_addr is 0 (from the find_pc_partial_function call).\n");
+    fprintf_unfiltered(gdb_stdlog, "Forcing it to the value of the PC (%s) to avoid the riscv_scan_prologue reading between 0-99 addresses.\n", core_addr_to_string(pc));
+    start_addr = pc;
+  }  
+  // Hack end
+
   trad_frame_set_id (this_trad_cache, frame_id_build (stack_addr, start_addr));
 
   trad_frame_set_this_base (this_trad_cache, stack_addr);
